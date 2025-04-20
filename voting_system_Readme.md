@@ -133,6 +133,6 @@ This blockchain-based voting system offers a decentralized approach to group dec
 - Web3 Developer Ecosystem
 - Open-Source Contributors
 
----
+## Contract Details: 0x8963150721D8909CCB6e04c0d79a2B3dd351Ed54
 
-**Disclaimer**: This is a community-driven project. Always conduct your own research and use at your own risk.
+<img width="950" alt="image" src="https://github.com/user-attachments/assets/d6a2e12a-7a89-4f4d-975a-07353cae2aea" />
