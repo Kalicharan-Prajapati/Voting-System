@@ -144,7 +144,7 @@ contract GroupVotingSystem {
         emit VoteCast(_proposalId, msg.sender, _voteType);
     }
 
-    // Finalize proposal
+    // Finalize the proposal
     function finalizeProposal(uint256 _proposalId) external {
         Proposal storage proposal = proposals[_proposalId];
         
