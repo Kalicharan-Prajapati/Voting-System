@@ -126,7 +126,7 @@ This blockchain-based voting system offers a decentralized approach to group dec
 - **Project Lead**: [Your Name]
 - **Email**: [Contact Email]
 - **Discord**: [Community Server Link]
-- **Twitter**: [Project Twitter Handle]
+
 
 ## 🙏 Acknowledgements
 - Ethereum Community
