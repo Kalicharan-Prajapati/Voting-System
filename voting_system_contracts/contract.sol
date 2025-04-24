@@ -196,7 +196,7 @@ contract GroupVotingSystem {
         );
     }
 
-    // Group membership check !!
+    // Group membership check
     function isGroupMember(address _member) external view returns (bool) {
         return groupMembers[_member];
     }
