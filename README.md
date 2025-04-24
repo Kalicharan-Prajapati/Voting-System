@@ -49,7 +49,7 @@ Our mission is to empower decentralized governance by offering a platform where 
 
 ---
 
-## 🔮 Future Scope
+## 🔮 Future Scopes 
 
 ### 🕒 Short-Term Enhancements
 - 📊 Weighted voting mechanisms  
