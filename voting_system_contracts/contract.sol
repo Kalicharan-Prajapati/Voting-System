@@ -170,7 +170,7 @@ contract GroupVotingSystem {
         emit ProposalFinalized(_proposalId, proposal.status);
     }
 
-    // View functions for proposal details
+    // View functions for proposal detail
     function getProposalDetails(uint256 _proposalId) 
         external 
         view 
