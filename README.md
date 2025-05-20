@@ -113,7 +113,7 @@ Our mission is to empower decentralized governance by offering a platform where 
 
 
 ---
-## 🙏 Acknowledgements
+## 🙏 Acknowledgement
 
 - Ethereum Foundation  
 - Web3 Developer Community  
