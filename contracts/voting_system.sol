@@ -58,7 +58,7 @@ contract GroupVotingSystem {
     uint256 public memberCount;
 
     // Proposal tracking
-    mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => Proposal) private proposals;
 
     // Voting configuration
     uint256 public requiredQuorum;
@@ -76,6 +76,7 @@ contract GroupVotingSystem {
     }
 
     constructor(uint256 _requiredQuorum, uint256 _votingPeriod) {
+        require(_votingPeriod >= MIN_VOTING_DURATION && _votingPeriod <= MAX_VOTING_DURATION, "Voting period out of range");
         owner = msg.sender;
         requiredQuorum = _requiredQuorum;
         votingPeriod = _votingPeriod;
@@ -199,5 +200,21 @@ contract GroupVotingSystem {
     // Group membership check
     function isGroupMember(address _member) external view returns (bool) {
         return groupMembers[_member];
+    }
+
+    // 🔴 New Function: Cancel a proposal
+    function cancelProposal(uint256 _proposalId) external {
+        Proposal storage proposal = proposals[_proposalId];
+
+        require(
+            msg.sender == proposal.proposer || msg.sender == owner,
+            "Only proposer or owner can cancel"
+        );
+        require(block.timestamp <= proposal.votingDeadline, "Voting already ended");
+        require(proposal.status == ProposalStatus.Pending, "Cannot cancel finalized proposal");
+
+        proposal.status = ProposalStatus.Cancelled;
+
+        emit ProposalFinalized(_proposalId, ProposalStatus.Cancelled);
     }
 }
