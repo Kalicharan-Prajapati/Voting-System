@@ -202,7 +202,7 @@ contract GroupVotingSystem {
         return groupMembers[_member];
     }
 
-    // 🔴 New Function: Cancel a proposal
+    // Cancel a proposal
     function cancelProposal(uint256 _proposalId) external {
         Proposal storage proposal = proposals[_proposalId];
 
@@ -216,5 +216,15 @@ contract GroupVotingSystem {
         proposal.status = ProposalStatus.Cancelled;
 
         emit ProposalFinalized(_proposalId, ProposalStatus.Cancelled);
+    }
+
+    // Get total number of proposals
+    function getProposalCount() external view returns (uint256) {
+        return proposalCount;
+    }
+
+    // Check if a proposal is cancelled
+    function isProposalCancelled(uint256 _proposalId) external view returns (bool) {
+        return proposals[_proposalId].status == ProposalStatus.Cancelled;
     }
 }
