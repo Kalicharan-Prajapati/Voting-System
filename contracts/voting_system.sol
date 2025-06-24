@@ -3,21 +3,12 @@ pragma solidity ^0.8.20;
 
 contract GroupVotingSystem {
     // Enum for proposal status
-    enum ProposalStatus {
-        Pending,
-        Accepted,
-        Rejected,
-        Cancelled
-    }
+    enum ProposalStatus { Pending, Accepted, Rejected, Cancelled }
 
-    // Enum for vote types
-    enum VoteType {
-        None,
-        For,
-        Against
-    }
+    // Enum for vote type
+    enum VoteType { None, For, Against }
 
-    // Voting proposal structure
+    // Proposal structure
     struct Proposal {
         uint256 id;
         string description;
@@ -31,129 +22,124 @@ contract GroupVotingSystem {
         mapping(address => VoteType) votes;
     }
 
-    // Events for transparency and tracking
+    // Events
     event ProposalCreated(uint256 indexed proposalId, string description, address indexed proposer);
     event VoteCast(uint256 indexed proposalId, address indexed voter, VoteType voteType);
     event ProposalFinalized(uint256 indexed proposalId, ProposalStatus status);
+    event ProposalCancelled(uint256 indexed proposalId);
 
-    // Contract management
     address public owner;
     uint256 public constant MIN_VOTING_DURATION = 1 days;
     uint256 public constant MAX_VOTING_DURATION = 30 days;
     uint256 public proposalCount;
 
-    // Group membership and permissions
     mapping(address => bool) public groupMembers;
     uint256 public memberCount;
 
-    // Proposal tracking
     mapping(uint256 => Proposal) private proposals;
 
-    // Voting configuration
-    uint256 public requiredQuorum;
+    uint256 public requiredQuorumPercent;
     uint256 public votingPeriod;
 
-    // Modifiers for access control
+    // Modifiers
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can perform this action");
+        require(msg.sender == owner, "Caller is not the owner");
         _;
     }
 
     modifier onlyGroupMember() {
-        require(groupMembers[msg.sender], "Only group members can perform this action");
+        require(groupMembers[msg.sender], "Caller is not a group member");
         _;
     }
 
-    constructor(uint256 _requiredQuorum, uint256 _votingPeriod) {
+    constructor(uint256 _requiredQuorumPercent, uint256 _votingPeriod) {
+        require(_requiredQuorumPercent > 0 && _requiredQuorumPercent <= 100, "Invalid quorum percent");
         require(_votingPeriod >= MIN_VOTING_DURATION && _votingPeriod <= MAX_VOTING_DURATION, "Voting period out of range");
+
         owner = msg.sender;
-        requiredQuorum = _requiredQuorum;
+        requiredQuorumPercent = _requiredQuorumPercent;
         votingPeriod = _votingPeriod;
 
-        // Add contract creator as initial group member
         groupMembers[msg.sender] = true;
         memberCount = 1;
     }
 
-    // Group management functions
+    // Group management
     function addGroupMember(address _member) external onlyOwner {
-        require(!groupMembers[_member], "Member already exists");
+        require(_member != address(0), "Invalid address");
+        require(!groupMembers[_member], "Already a member");
         groupMembers[_member] = true;
         memberCount++;
     }
 
     function removeGroupMember(address _member) external onlyOwner {
-        require(groupMembers[_member], "Member does not exist");
+        require(groupMembers[_member], "Not a member");
         groupMembers[_member] = false;
         memberCount--;
     }
 
     // Proposal creation
-    function createProposal(string memory _description) external onlyGroupMember returns (uint256) {
+    function createProposal(string calldata _description) external onlyGroupMember returns (uint256) {
         proposalCount++;
 
-        Proposal storage newProposal = proposals[proposalCount];
-        newProposal.id = proposalCount;
-        newProposal.description = _description;
-        newProposal.proposer = msg.sender;
-        newProposal.createdAt = block.timestamp;
-        newProposal.votingDeadline = block.timestamp + votingPeriod;
-        newProposal.status = ProposalStatus.Pending;
+        Proposal storage p = proposals[proposalCount];
+        p.id = proposalCount;
+        p.description = _description;
+        p.proposer = msg.sender;
+        p.createdAt = block.timestamp;
+        p.votingDeadline = block.timestamp + votingPeriod;
+        p.status = ProposalStatus.Pending;
 
-        emit ProposalCreated(proposalCount, _description, msg.sender);
-        return proposalCount;
+        emit ProposalCreated(p.id, _description, msg.sender);
+        return p.id;
     }
 
-    // Voting function
+    // Voting
     function vote(uint256 _proposalId, VoteType _voteType) external onlyGroupMember {
-        Proposal storage proposal = proposals[_proposalId];
+        require(_voteType == VoteType.For || _voteType == VoteType.Against, "Invalid vote type");
 
-        require(block.timestamp <= proposal.votingDeadline, "Voting period has ended");
-        require(!proposal.hasVoted[msg.sender], "Already voted");
-        require(_voteType != VoteType.None, "Invalid vote type");
+        Proposal storage p = proposals[_proposalId];
+        require(block.timestamp <= p.votingDeadline, "Voting closed");
+        require(!p.hasVoted[msg.sender], "Already voted");
 
-        proposal.hasVoted[msg.sender] = true;
-        proposal.votes[msg.sender] = _voteType;
+        p.hasVoted[msg.sender] = true;
+        p.votes[msg.sender] = _voteType;
 
         if (_voteType == VoteType.For) {
-            proposal.votesFor++;
+            p.votesFor++;
         } else {
-            proposal.votesAgainst++;
+            p.votesAgainst++;
         }
 
         emit VoteCast(_proposalId, msg.sender, _voteType);
     }
 
-    // Finalize the proposal
+    // Finalizing proposal
     function finalizeProposal(uint256 _proposalId) external {
-        Proposal storage proposal = proposals[_proposalId];
+        Proposal storage p = proposals[_proposalId];
 
-        require(block.timestamp > proposal.votingDeadline, "Voting period not ended");
-        require(proposal.status == ProposalStatus.Pending, "Proposal already finalized");
+        require(block.timestamp > p.votingDeadline, "Voting period not ended");
+        require(p.status == ProposalStatus.Pending, "Proposal already finalized");
 
-        uint256 totalVotes = proposal.votesFor + proposal.votesAgainst;
-        uint256 participationRate = (totalVotes * 100) / memberCount;
+        uint256 totalVotes = p.votesFor + p.votesAgainst;
+        uint256 quorum = (memberCount * requiredQuorumPercent) / 100;
 
-        if (participationRate >= requiredQuorum) {
-            if (proposal.votesFor > proposal.votesAgainst) {
-                proposal.status = ProposalStatus.Accepted;
-            } else {
-                proposal.status = ProposalStatus.Rejected;
-            }
+        if (totalVotes >= quorum) {
+            p.status = (p.votesFor > p.votesAgainst) ? ProposalStatus.Accepted : ProposalStatus.Rejected;
         } else {
-            proposal.status = ProposalStatus.Rejected;
+            p.status = ProposalStatus.Rejected;
         }
 
-        emit ProposalFinalized(_proposalId, proposal.status);
+        emit ProposalFinalized(_proposalId, p.status);
     }
 
-    // Cancel a proposal (NEW FEATURE)
+    // Cancelling a proposal
     function cancelProposal(uint256 _proposalId) external onlyOwner {
-        Proposal storage proposal = proposals[_proposalId];
-        require(proposal.status == ProposalStatus.Pending, "Proposal cannot be cancelled");
-        proposal.status = ProposalStatus.Cancelled;
+        Proposal storage p = proposals[_proposalId];
+        require(p.status == ProposalStatus.Pending, "Cannot cancel finalized proposal");
 
-        emit ProposalFinalized(_proposalId, ProposalStatus.Cancelled);
+        p.status = ProposalStatus.Cancelled;
+        emit ProposalCancelled(_proposalId);
     }
 
     // View proposal details
@@ -170,20 +156,20 @@ contract GroupVotingSystem {
             uint256 votesAgainst
         )
     {
-        Proposal storage proposal = proposals[_proposalId];
+        Proposal storage p = proposals[_proposalId];
         return (
-            proposal.description,
-            proposal.proposer,
-            proposal.createdAt,
-            proposal.votingDeadline,
-            proposal.status,
-            proposal.votesFor,
-            proposal.votesAgainst
+            p.description,
+            p.proposer,
+            p.createdAt,
+            p.votingDeadline,
+            p.status,
+            p.votesFor,
+            p.votesAgainst
         );
     }
 
-    // Check if address is a group member
-    function isGroupMember(address _member) external view returns (bool) {
-        return groupMembers[_member];
+    // Check group membership
+    function isGroupMember(address _addr) external view returns (bool) {
+        return groupMembers[_addr];
     }
 }
