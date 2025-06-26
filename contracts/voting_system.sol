@@ -10,33 +10,32 @@ contract GroupVotingSystem {
 
     // Proposal structure
     struct Proposal {
-        uint32 id;
+        uint256 id;
         string description;
         address proposer;
-        uint32 createdAt;
-        uint32 votingDeadline;
+        uint256 createdAt;
+        uint256 votingDeadline;
         ProposalStatus status;
-        uint16 votesFor;
-        uint16 votesAgainst;
+        uint256 votesFor;
+        uint256 votesAgainst;
         mapping(address => bool) hasVoted;
         mapping(address => VoteType) votes;
     }
 
     // Events
-    event ProposalCreated(uint32 indexed proposalId, string description, address indexed proposer);
-    event VoteCast(uint32 indexed proposalId, address indexed voter, VoteType voteType);
-    event ProposalFinalized(uint32 indexed proposalId, ProposalStatus status);
-    event ProposalCancelled(uint32 indexed proposalId);
+    event ProposalCreated(uint256 indexed proposalId, string description, address indexed proposer);
+    event VoteCast(uint256 indexed proposalId, address indexed voter, VoteType voteType);
+    event ProposalFinalized(uint256 indexed proposalId, ProposalStatus status);
+    event ProposalCancelled(uint256 indexed proposalId);
+    event MemberAdded(address indexed member);
 
     address public owner;
     uint256 public constant MIN_VOTING_DURATION = 1 days;
     uint256 public constant MAX_VOTING_DURATION = 30 days;
-    uint32 public proposalCount;
+    uint256 public proposalCount;
 
     mapping(address => bool) public groupMembers;
     uint256 public memberCount;
-
-    mapping(uint32 => Proposal) private proposals;
 
     uint256 public requiredQuorumPercent;
     uint256 public votingPeriod;
@@ -68,26 +67,30 @@ contract GroupVotingSystem {
     function addGroupMember(address _member) external onlyOwner {
         require(_member != address(0), "Invalid address");
         require(!groupMembers[_member], "Already a member");
+
         groupMembers[_member] = true;
         memberCount++;
+
+        emit MemberAdded(_member);
     }
 
     function removeGroupMember(address _member) external onlyOwner {
         require(groupMembers[_member], "Not a member");
+
         groupMembers[_member] = false;
         memberCount--;
     }
 
     // Proposal creation
-    function createProposal(string calldata _description) external onlyGroupMember returns (uint32) {
+    function createProposal(string calldata _description) external onlyGroupMember returns (uint256) {
         proposalCount++;
 
         Proposal storage p = proposals[proposalCount];
         p.id = proposalCount;
         p.description = _description;
         p.proposer = msg.sender;
-        p.createdAt = uint32(block.timestamp);
-        p.votingDeadline = uint32(block.timestamp + votingPeriod);
+        p.createdAt = block.timestamp;
+        p.votingDeadline = block.timestamp + votingPeriod;
         p.status = ProposalStatus.Pending;
 
         emit ProposalCreated(p.id, _description, msg.sender);
@@ -95,7 +98,7 @@ contract GroupVotingSystem {
     }
 
     // Voting
-    function vote(uint32 _proposalId, VoteType _voteType) external onlyGroupMember {
+    function vote(uint256 _proposalId, VoteType _voteType) external onlyGroupMember {
         require(_voteType == VoteType.For || _voteType == VoteType.Against, "Invalid vote type");
 
         Proposal storage p = proposals[_proposalId];
@@ -115,7 +118,7 @@ contract GroupVotingSystem {
     }
 
     // Finalizing proposal
-    function finalizeProposal(uint32 _proposalId) external {
+    function finalizeProposal(uint256 _proposalId) external {
         Proposal storage p = proposals[_proposalId];
 
         require(block.timestamp > p.votingDeadline, "Voting period not ended");
@@ -134,7 +137,7 @@ contract GroupVotingSystem {
     }
 
     // Cancelling a proposal
-    function cancelProposal(uint32 _proposalId) external onlyOwner {
+    function cancelProposal(uint256 _proposalId) external onlyOwner {
         Proposal storage p = proposals[_proposalId];
         require(p.status == ProposalStatus.Pending, "Cannot cancel finalized proposal");
 
@@ -143,17 +146,17 @@ contract GroupVotingSystem {
     }
 
     // View proposal details
-    function getProposalDetails(uint32 _proposalId)
+    function getProposalDetails(uint256 _proposalId)
         external
         view
         returns (
             string memory description,
             address proposer,
-            uint32 createdAt,
-            uint32 votingDeadline,
+            uint256 createdAt,
+            uint256 votingDeadline,
             ProposalStatus status,
-            uint16 votesFor,
-            uint16 votesAgainst
+            uint256 votesFor,
+            uint256 votesAgainst
         )
     {
         Proposal storage p = proposals[_proposalId];
