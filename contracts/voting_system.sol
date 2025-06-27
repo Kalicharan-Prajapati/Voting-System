@@ -2,10 +2,8 @@
 pragma solidity ^0.8.0;
 
 contract GroupVotingSystem {
-    // Enum for proposal status
+    // Enum definitions
     enum ProposalStatus { Pending, Accepted, Rejected, Cancelled }
-
-    // Enum for vote type
     enum VoteType { None, For, Against }
 
     // Proposal structure
@@ -29,14 +27,16 @@ contract GroupVotingSystem {
     event ProposalCancelled(uint256 indexed proposalId);
     event MemberAdded(address indexed member);
 
-    address public owner;
+    // Constants
     uint256 public constant MIN_VOTING_DURATION = 1 days;
     uint256 public constant MAX_VOTING_DURATION = 30 days;
-    uint256 public proposalCount;
 
+    // State variables
+    address public owner;
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
     mapping(address => bool) public groupMembers;
     uint256 public memberCount;
-
     uint256 public requiredQuorumPercent;
     uint256 public votingPeriod;
 
@@ -51,6 +51,7 @@ contract GroupVotingSystem {
         _;
     }
 
+    // Constructor
     constructor(uint256 _requiredQuorumPercent, uint256 _votingPeriod) {
         require(_requiredQuorumPercent > 0 && _requiredQuorumPercent <= 100, "Invalid quorum percent");
         require(_votingPeriod >= MIN_VOTING_DURATION && _votingPeriod <= MAX_VOTING_DURATION, "Voting period out of range");
@@ -120,7 +121,6 @@ contract GroupVotingSystem {
     // Finalizing proposal
     function finalizeProposal(uint256 _proposalId) external {
         Proposal storage p = proposals[_proposalId];
-
         require(block.timestamp > p.votingDeadline, "Voting period not ended");
         require(p.status == ProposalStatus.Pending, "Proposal already finalized");
 
@@ -146,19 +146,15 @@ contract GroupVotingSystem {
     }
 
     // View proposal details
-    function getProposalDetails(uint256 _proposalId)
-        external
-        view
-        returns (
-            string memory description,
-            address proposer,
-            uint256 createdAt,
-            uint256 votingDeadline,
-            ProposalStatus status,
-            uint256 votesFor,
-            uint256 votesAgainst
-        )
-    {
+    function getProposalDetails(uint256 _proposalId) external view returns (
+        string memory description,
+        address proposer,
+        uint256 createdAt,
+        uint256 votingDeadline,
+        ProposalStatus status,
+        uint256 votesFor,
+        uint256 votesAgainst
+    ) {
         Proposal storage p = proposals[_proposalId];
         return (
             p.description,
