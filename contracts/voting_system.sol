@@ -16,6 +16,7 @@ contract GroupVotingSystem {
         ProposalStatus status;
         uint256 votesFor;
         uint256 votesAgainst;
+        uint256 votesCount; // Total number of votes
         mapping(address => bool) hasVoted;
         mapping(address => VoteType) votes;
     }
@@ -48,6 +49,16 @@ contract GroupVotingSystem {
 
     modifier onlyGroupMember() {
         require(groupMembers[msg.sender], "Caller is not a group member");
+        _;
+    }
+
+    modifier onlyPending(uint256 _proposalId) {
+        require(proposals[_proposalId].status == ProposalStatus.Pending, "Proposal is not pending");
+        _;
+    }
+
+    modifier onlyOpen(uint256 _proposalId) {
+        require(block.timestamp <= proposals[_proposalId].votingDeadline, "Voting is closed");
         _;
     }
 
@@ -99,15 +110,15 @@ contract GroupVotingSystem {
     }
 
     // Voting
-    function vote(uint256 _proposalId, VoteType _voteType) external onlyGroupMember {
+    function vote(uint256 _proposalId, VoteType _voteType) external onlyGroupMember onlyPending(_proposalId) onlyOpen(_proposalId) {
         require(_voteType == VoteType.For || _voteType == VoteType.Against, "Invalid vote type");
 
         Proposal storage p = proposals[_proposalId];
-        require(block.timestamp <= p.votingDeadline, "Voting closed");
         require(!p.hasVoted[msg.sender], "Already voted");
 
         p.hasVoted[msg.sender] = true;
         p.votes[msg.sender] = _voteType;
+        p.votesCount++;
 
         if (_voteType == VoteType.For) {
             p.votesFor++;
@@ -119,12 +130,11 @@ contract GroupVotingSystem {
     }
 
     // Finalizing proposal
-    function finalizeProposal(uint256 _proposalId) external {
+    function finalizeProposal(uint256 _proposalId) external onlyOwner onlyPending(_proposalId) {
         Proposal storage p = proposals[_proposalId];
         require(block.timestamp > p.votingDeadline, "Voting period not ended");
-        require(p.status == ProposalStatus.Pending, "Proposal already finalized");
 
-        uint256 totalVotes = p.votesFor + p.votesAgainst;
+        uint256 totalVotes = p.votesCount;
         uint256 quorum = (memberCount * requiredQuorumPercent) / 100;
 
         if (totalVotes >= quorum) {
@@ -137,9 +147,8 @@ contract GroupVotingSystem {
     }
 
     // Cancelling a proposal
-    function cancelProposal(uint256 _proposalId) external onlyOwner {
+    function cancelProposal(uint256 _proposalId) external onlyOwner onlyPending(_proposalId) {
         Proposal storage p = proposals[_proposalId];
-        require(p.status == ProposalStatus.Pending, "Cannot cancel finalized proposal");
 
         p.status = ProposalStatus.Cancelled;
         emit ProposalCancelled(_proposalId);
