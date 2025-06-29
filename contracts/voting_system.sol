@@ -14,8 +14,6 @@ contract GroupVotingSystem {
         uint256 createdAt;
         uint256 votingDeadline;
         ProposalStatus status;
-        uint256 votesFor;
-        uint256 votesAgainst;
         uint256 votesCount; // Total number of votes
         mapping(address => bool) hasVoted;
         mapping(address => VoteType) votes;
@@ -120,12 +118,6 @@ contract GroupVotingSystem {
         p.votes[msg.sender] = _voteType;
         p.votesCount++;
 
-        if (_voteType == VoteType.For) {
-            p.votesFor++;
-        } else {
-            p.votesAgainst++;
-        }
-
         emit VoteCast(_proposalId, msg.sender, _voteType);
     }
 
@@ -138,7 +130,7 @@ contract GroupVotingSystem {
         uint256 quorum = (memberCount * requiredQuorumPercent) / 100;
 
         if (totalVotes >= quorum) {
-            p.status = (p.votesFor > p.votesAgainst) ? ProposalStatus.Accepted : ProposalStatus.Rejected;
+            p.status = (p.votesFor > p.votesCount - p.votesFor) ? ProposalStatus.Accepted : ProposalStatus.Rejected;
         } else {
             p.status = ProposalStatus.Rejected;
         }
@@ -172,7 +164,7 @@ contract GroupVotingSystem {
             p.votingDeadline,
             p.status,
             p.votesFor,
-            p.votesAgainst
+            p.votesCount - p.votesFor
         );
     }
 
