@@ -14,7 +14,8 @@ contract GroupVotingSystem {
         uint256 createdAt;
         uint256 votingDeadline;
         ProposalStatus status;
-        uint256 votesCount; // Total number of votes
+        uint256 totalVotes;
+        uint256 votesFor;
         mapping(address => bool) hasVoted;
         mapping(address => VoteType) votes;
     }
@@ -116,7 +117,11 @@ contract GroupVotingSystem {
 
         p.hasVoted[msg.sender] = true;
         p.votes[msg.sender] = _voteType;
-        p.votesCount++;
+        p.totalVotes++;
+
+        if (_voteType == VoteType.For) {
+            p.votesFor++;
+        }
 
         emit VoteCast(_proposalId, msg.sender, _voteType);
     }
@@ -126,11 +131,11 @@ contract GroupVotingSystem {
         Proposal storage p = proposals[_proposalId];
         require(block.timestamp > p.votingDeadline, "Voting period not ended");
 
-        uint256 totalVotes = p.votesCount;
+        uint256 totalVotes = p.totalVotes;
         uint256 quorum = (memberCount * requiredQuorumPercent) / 100;
 
         if (totalVotes >= quorum) {
-            p.status = (p.votesFor > p.votesCount - p.votesFor) ? ProposalStatus.Accepted : ProposalStatus.Rejected;
+            p.status = (p.votesFor > totalVotes - p.votesFor) ? ProposalStatus.Accepted : ProposalStatus.Rejected;
         } else {
             p.status = ProposalStatus.Rejected;
         }
@@ -164,7 +169,7 @@ contract GroupVotingSystem {
             p.votingDeadline,
             p.status,
             p.votesFor,
-            p.votesCount - p.votesFor
+            p.totalVotes - p.votesFor
         );
     }
 
