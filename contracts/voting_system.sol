@@ -26,6 +26,7 @@ contract GroupVotingSystem {
     event ProposalFinalized(uint256 indexed proposalId, ProposalStatus status);
     event ProposalCancelled(uint256 indexed proposalId);
     event MemberAdded(address indexed member);
+    event MemberRemoved(address indexed member);
 
     // Constants
     uint256 public constant MIN_VOTING_DURATION = 1 days;
@@ -90,6 +91,8 @@ contract GroupVotingSystem {
 
         groupMembers[_member] = false;
         memberCount--;
+
+        emit MemberRemoved(_member);
     }
 
     // Proposal creation
