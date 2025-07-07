@@ -6,7 +6,6 @@ contract GroupVotingSystem {
     enum VoteType { None, For, Against }
 
     struct Proposal {
-        uint256 id;
         string description;
         address proposer;
         uint256 createdAt;
@@ -33,7 +32,6 @@ contract GroupVotingSystem {
     uint256 public constant MAX_VOTING_DURATION = 30 days;
 
     address public owner;
-    uint256 public proposalCount;
     mapping(uint256 => Proposal) public proposals;
     mapping(address => bool) public groupMembers;
     uint256 public memberCount;
@@ -72,7 +70,6 @@ contract GroupVotingSystem {
         memberCount = 1;
     }
 
-    // Group Management
     function addGroupMember(address _member) external onlyOwner {
         require(_member != address(0), "Invalid address");
         require(!groupMembers[_member], "Already a member");
@@ -92,23 +89,20 @@ contract GroupVotingSystem {
         emit MemberRemoved(_member);
     }
 
-    // Create Proposal
     function createProposal(string calldata _description) external onlyGroupMember returns (uint256) {
-        proposalCount++;
-        Proposal storage p = proposals[proposalCount];
+        uint256 proposalId = proposals.length;
+        Proposal storage p = proposals[proposalId];
 
-        p.id = proposalCount;
         p.description = _description;
         p.proposer = msg.sender;
         p.createdAt = block.timestamp;
         p.votingDeadline = block.timestamp + votingPeriod;
         p.status = ProposalStatus.Pending;
 
-        emit ProposalCreated(p.id, _description, msg.sender);
-        return p.id;
+        emit ProposalCreated(proposalId, _description, msg.sender);
+        return proposalId;
     }
 
-    // Cast Vote
     function vote(uint256 _proposalId, VoteType _voteType) external onlyGroupMember onlyPending(_proposalId) onlyOpen(_proposalId) {
         require(_voteType == VoteType.For || _voteType == VoteType.Against, "Invalid vote type");
         Proposal storage p = proposals[_proposalId];
@@ -125,7 +119,6 @@ contract GroupVotingSystem {
         emit VoteCast(_proposalId, msg.sender, _voteType);
     }
 
-    // Withdraw Vote
     function withdrawVote(uint256 _proposalId) external onlyGroupMember onlyPending(_proposalId) onlyOpen(_proposalId) {
         Proposal storage p = proposals[_proposalId];
         require(p.hasVoted[msg.sender], "You haven't voted");
@@ -141,7 +134,6 @@ contract GroupVotingSystem {
         emit VoteWithdrawn(_proposalId, msg.sender);
     }
 
-    // Amend Proposal (by proposer)
     function amendProposal(uint256 _proposalId, string calldata _newDescription, uint256 _newVotingPeriod) external onlyGroupMember onlyPending(_proposalId) onlyOpen(_proposalId) {
         Proposal storage p = proposals[_proposalId];
         require(p.proposer == msg.sender, "Only proposer can amend");
@@ -156,7 +148,6 @@ contract GroupVotingSystem {
         emit ProposalAmended(_proposalId, _newDescription, p.votingDeadline);
     }
 
-    // Extend Voting Period
     function extendVotingPeriod(uint256 _proposalId, uint256 _extraTime) external onlyOwner onlyPending(_proposalId) {
         Proposal storage p = proposals[_proposalId];
         require(block.timestamp <= p.votingDeadline, "Already closed");
@@ -167,7 +158,6 @@ contract GroupVotingSystem {
         emit VotingExtended(_proposalId, p.votingDeadline);
     }
 
-    // Finalize Proposal
     function finalizeProposal(uint256 _proposalId) external onlyOwner onlyPending(_proposalId) {
         Proposal storage p = proposals[_proposalId];
         require(block.timestamp > p.votingDeadline, "Voting period not ended");
@@ -185,7 +175,6 @@ contract GroupVotingSystem {
         emit ProposalFinalized(_proposalId, p.status);
     }
 
-    // Cancel Proposal
     function cancelProposal(uint256 _proposalId) external onlyOwner onlyPending(_proposalId) {
         Proposal storage p = proposals[_proposalId];
         p.status = ProposalStatus.Cancelled;
@@ -193,7 +182,6 @@ contract GroupVotingSystem {
         emit ProposalCancelled(_proposalId);
     }
 
-    // Adjust Quorum %
     function adjustQuorum(uint256 _newPercent) external onlyOwner {
         require(_newPercent > 0 && _newPercent <= 100, "Invalid quorum percent");
         requiredQuorumPercent = _newPercent;
@@ -201,7 +189,6 @@ contract GroupVotingSystem {
         emit QuorumAdjusted(_newPercent);
     }
 
-    // View Proposal
     function getProposalDetails(uint256 _proposalId) external view returns (
         string memory description,
         address proposer,
@@ -223,7 +210,6 @@ contract GroupVotingSystem {
         );
     }
 
-    // Check Membership
     function isGroupMember(address _addr) external view returns (bool) {
         return groupMembers[_addr];
     }
