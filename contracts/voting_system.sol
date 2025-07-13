@@ -119,4 +119,71 @@ contract GroupVotingSystem {
         emit VoteCast(_proposalId, msg.sender, _voteType);
     }
 
-    function withdrawVote(uint256 _
+    function withdrawVote(uint256 _proposalId) external onlyGroupMember onlyPending(_proposalId) onlyOpen(_proposalId) {
+        Proposal storage p = proposals[_proposalId];
+        require(p.hasVoted[msg.sender], "Has not voted");
+
+        p.hasVoted[msg.sender] = false;
+        p.totalVotes--;
+
+        if (p.votes[msg.sender] == VoteType.For) {
+            p.votesFor--;
+        }
+
+        emit VoteWithdrawn(_proposalId, msg.sender);
+    }
+
+    function finalizeProposal(uint256 _proposalId) external onlyOwner onlyPending(_proposalId) {
+        Proposal storage p = proposals[_proposalId];
+
+        // Check if voting period has ended
+        require(block.timestamp > p.votingDeadline, "Voting is still open");
+
+        // Check if quorum is met
+        uint256 totalGroupMembers = memberCount;
+        uint256 totalVotes = p.totalVotes;
+        uint256 quorum = (totalVotes * 100) / totalGroupMembers;
+        require(quorum >= requiredQuorumPercent, "Quorum not met");
+
+        // Determine proposal status based on votes
+        if (p.votesFor > totalVotes / 2) {
+            p.status = ProposalStatus.Accepted;
+        } else {
+            p.status = ProposalStatus.Rejected;
+        }
+
+        emit ProposalFinalized(_proposalId, p.status);
+    }
+
+    function cancelProposal(uint256 _proposalId) external onlyOwner onlyPending(_proposalId) {
+        Proposal storage p = proposals[_proposalId];
+        p.status = ProposalStatus.Cancelled;
+
+        emit ProposalCancelled(_proposalId);
+    }
+
+    function amendProposal(uint256 _proposalId, string calldata _newDescription, uint256 _newDeadline) external onlyOwner onlyPending(_proposalId) {
+        Proposal storage p = proposals[_proposalId];
+
+        p.description = _newDescription;
+        p.votingDeadline = block.timestamp + _newDeadline;
+
+        emit ProposalAmended(_proposalId, _newDescription, p.votingDeadline);
+    }
+
+    function adjustQuorum(uint256 _newQuorumPercent) external onlyOwner {
+        require(_newQuorumPercent > 0 && _newQuorumPercent <= 100, "Invalid quorum percent");
+        requiredQuorumPercent = _newQuorumPercent;
+
+        emit QuorumAdjusted(_newQuorumPercent);
+    }
+
+    function extendVotingPeriod(uint256 _proposalId, uint256 _newDeadline) external onlyOwner onlyPending(_proposalId) {
+        require(_newDeadline > block.timestamp + votingPeriod, "New deadline must be after current deadline");
+
+        Proposal storage p = proposals[_proposalId];
+        p.votingDeadline = _newDeadline;
+
+        emit VotingExtended(_proposalId, _newDeadline);
+    }
+}
