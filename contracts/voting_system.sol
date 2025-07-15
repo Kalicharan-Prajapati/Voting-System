@@ -181,4 +181,51 @@ contract GroupVotingSystem {
 
         emit VotingExtended(proposalId, newDeadline);
     }
+
+    // ----------- Additional Utility Functions -----------
+
+    function getProposalDetails(uint256 proposalId) external view returns (
+        string memory description,
+        address proposer,
+        uint256 createdAt,
+        uint256 votingDeadline,
+        ProposalStatus status,
+        uint256 totalVotes,
+        uint256 votesFor
+    ) {
+        Proposal storage p = proposals[proposalId];
+        return (
+            p.description,
+            p.proposer,
+            p.createdAt,
+            p.votingDeadline,
+            p.status,
+            p.totalVotes,
+            p.votesFor
+        );
+    }
+
+    function hasVoted(uint256 proposalId, address member) external view returns (bool) {
+        return proposals[proposalId].hasVoted[member];
+    }
+
+    function getMemberVote(uint256 proposalId, address member) external view returns (VoteType) {
+        return proposals[proposalId].votes[member];
+    }
+
+    function isGroupMember(address member) external view returns (bool) {
+        return groupMembers[member];
+    }
+
+    function getRequiredQuorumPercent() external view returns (uint256) {
+        return requiredQuorumPercent;
+    }
+
+    function getVotingPeriod() external view returns (uint256) {
+        return votingPeriod;
+    }
+
+    function getProposalStatus(uint256 proposalId) external view returns (ProposalStatus) {
+        return proposals[proposalId].status;
+    }
 }
