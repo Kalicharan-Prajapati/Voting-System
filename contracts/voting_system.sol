@@ -17,6 +17,16 @@ contract GroupVotingSystem {
         mapping(address => VoteType) votes;
     }
 
+    struct ProposalDetails {
+        string description;
+        address proposer;
+        uint256 createdAt;
+        uint256 votingDeadline;
+        ProposalStatus status;
+        uint256 totalVotes;
+        uint256 votesFor;
+    }
+
     // Events
     event ProposalCreated(uint256 indexed proposalId, string description, address indexed proposer);
     event VoteCast(uint256 indexed proposalId, address indexed voter, VoteType voteType);
@@ -184,25 +194,17 @@ contract GroupVotingSystem {
 
     // ----------- Additional Utility Functions -----------
 
-    function getProposalDetails(uint256 proposalId) external view returns (
-        string memory description,
-        address proposer,
-        uint256 createdAt,
-        uint256 votingDeadline,
-        ProposalStatus status,
-        uint256 totalVotes,
-        uint256 votesFor
-    ) {
+    function getProposalDetails(uint256 proposalId) external view returns (ProposalDetails memory) {
         Proposal storage p = proposals[proposalId];
-        return (
-            p.description,
-            p.proposer,
-            p.createdAt,
-            p.votingDeadline,
-            p.status,
-            p.totalVotes,
-            p.votesFor
-        );
+        return ProposalDetails({
+            description: p.description,
+            proposer: p.proposer,
+            createdAt: p.createdAt,
+            votingDeadline: p.votingDeadline,
+            status: p.status,
+            totalVotes: p.totalVotes,
+            votesFor: p.votesFor
+        });
     }
 
     function hasVoted(uint256 proposalId, address member) external view returns (bool) {
