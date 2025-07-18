@@ -6,7 +6,7 @@ contract GroupVotingSystem {
     enum ProposalStatus { Pending, Accepted, Rejected, Cancelled }
     enum VoteType { None, For, Against }
 
-    // Structs
+    // Struct for Proposal
     struct Proposal {
         string description;
         address proposer;
@@ -17,16 +17,6 @@ contract GroupVotingSystem {
         uint256 votesFor;
         mapping(address => bool) hasVoted;
         mapping(address => VoteType) votes;
-    }
-
-    struct ProposalDetails {
-        string description;
-        address proposer;
-        uint256 createdAt;
-        uint256 votingDeadline;
-        ProposalStatus status;
-        uint256 totalVotes;
-        uint256 votesFor;
     }
 
     // Events
@@ -211,17 +201,8 @@ contract GroupVotingSystem {
 
     // ---------------- View Functions ----------------
 
-    function getProposalDetails(uint256 proposalId) external view returns (ProposalDetails memory) {
-        Proposal storage p = proposals[proposalId];
-        return ProposalDetails({
-            description: p.description,
-            proposer: p.proposer,
-            createdAt: p.createdAt,
-            votingDeadline: p.votingDeadline,
-            status: p.status,
-            totalVotes: p.totalVotes,
-            votesFor: p.votesFor
-        });
+    function getProposalDetails(uint256 proposalId) external view returns (Proposal memory) {
+        return proposals[proposalId];
     }
 
     function hasVoted(uint256 proposalId, address member) external view returns (bool) {
