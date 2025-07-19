@@ -199,6 +199,14 @@ contract GroupVotingSystem {
         emit QuorumAdjusted(newPercent);
     }
 
+    function updateVotingPeriod(uint256 newPeriod) external onlyOwner {
+        require(newPeriod >= MIN_VOTING_DURATION && newPeriod <= MAX_VOTING_DURATION, "Invalid voting period");
+
+        votingPeriod = newPeriod;
+
+        emit VotingPeriodUpdated(newPeriod);
+    }
+
     // ---------------- View Functions ----------------
 
     function getProposalDetails(uint256 proposalId) external view returns (Proposal memory) {
