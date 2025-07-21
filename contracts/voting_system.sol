@@ -15,7 +15,6 @@ contract GroupVotingSystem {
         uint256 votesFor;
     }
 
-    // Proposal mapping storage split to allow return of structs
     mapping(uint256 => ProposalData) private proposalInfo;
     mapping(uint256 => mapping(address => bool)) private hasVoted;
     mapping(uint256 => mapping(address => VoteType)) private voteRecord;
@@ -28,7 +27,6 @@ contract GroupVotingSystem {
     mapping(address => bool) public groupMembers;
     uint256[] private allProposalIds;
 
-    // Constants
     uint256 public constant MIN_VOTING_DURATION = 1 days;
     uint256 public constant MAX_VOTING_DURATION = 30 days;
 
@@ -90,6 +88,17 @@ contract GroupVotingSystem {
         groupMembers[member] = true;
         memberCount++;
         emit MemberAdded(member);
+    }
+
+    function addGroupMembers(address[] calldata members) external onlyOwner {
+        for (uint256 i = 0; i < members.length; i++) {
+            address member = members[i];
+            if (member != address(0) && !groupMembers[member]) {
+                groupMembers[member] = true;
+                memberCount++;
+                emit MemberAdded(member);
+            }
+        }
     }
 
     function removeGroupMember(address member) external onlyOwner {
@@ -225,5 +234,45 @@ contract GroupVotingSystem {
 
     function getAllProposalIds() external view returns (uint256[] memory) {
         return allProposalIds;
+    }
+
+    function getProposalsByStatus(ProposalStatus status) external view returns (uint256[] memory) {
+        uint256 count;
+        for (uint256 i = 0; i < allProposalIds.length; i++) {
+            if (proposalInfo[allProposalIds[i]].status == status) {
+                count++;
+            }
+        }
+
+        uint256[] memory filtered = new uint256[](count);
+        uint256 index;
+        for (uint256 i = 0; i < allProposalIds.length; i++) {
+            if (proposalInfo[allProposalIds[i]].status == status) {
+                filtered[index++] = allProposalIds[i];
+            }
+        }
+
+        return filtered;
+    }
+
+    function getTimeRemaining(uint256 proposalId) external view proposalExists(proposalId) returns (uint256) {
+        if (block.timestamp >= proposalInfo[proposalId].votingDeadline) {
+            return 0;
+        }
+        return proposalInfo[proposalId].votingDeadline - block.timestamp;
+    }
+
+    function getVotingSummary(uint256 proposalId)
+        external
+        view
+        proposalExists(proposalId)
+        returns (string memory description, ProposalStatus status, uint256 forVotes, uint256 totalVotes)
+    {
+        ProposalData storage p = proposalInfo[proposalId];
+        return (p.description, p.status, p.votesFor, p.totalVotes);
+    }
+
+    function totalProposals() external view returns (uint256) {
+        return allProposalIds.length;
     }
 }
