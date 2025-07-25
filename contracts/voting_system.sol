@@ -267,4 +267,26 @@ contract GroupVotingSystem {
     function totalProposals() external view returns (uint256) {
         return allProposalIds.length;
     }
+
+    // ✅ Newly Added Function
+    function getActiveProposals() external view returns (uint256[] memory) {
+        uint256 count;
+        for (uint256 i = 0; i < allProposalIds.length; i++) {
+            ProposalData storage p = proposalInfo[allProposalIds[i]];
+            if (p.status == ProposalStatus.Pending && block.timestamp <= p.votingDeadline) {
+                count++;
+            }
+        }
+
+        uint256[] memory activeProposals = new uint256[](count);
+        uint256 index;
+        for (uint256 i = 0; i < allProposalIds.length; i++) {
+            ProposalData storage p = proposalInfo[allProposalIds[i]];
+            if (p.status == ProposalStatus.Pending && block.timestamp <= p.votingDeadline) {
+                activeProposals[index++] = allProposalIds[i];
+            }
+        }
+
+        return activeProposals;
+    }
 }
