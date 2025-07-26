@@ -2,9 +2,11 @@
 pragma solidity ^0.8.0;
 
 contract GroupVotingSystem {
+    // ---------------- Enums ----------------
     enum ProposalStatus { Pending, Accepted, Rejected, Cancelled }
     enum VoteType { None, For, Against }
 
+    // ---------------- Structs ----------------
     struct ProposalData {
         string description;
         address proposer;
@@ -15,6 +17,7 @@ contract GroupVotingSystem {
         uint256 votesFor;
     }
 
+    // ---------------- State Variables ----------------
     address public owner;
     uint256 public memberCount;
     uint256 public requiredQuorumPercent;
@@ -24,7 +27,7 @@ contract GroupVotingSystem {
     uint256 public constant MAX_VOTING_DURATION = 30 days;
 
     mapping(address => bool) public groupMembers;
-    mapping(uint256 => ProposalData) private proposalInfo;
+    mapping(uint256 => ProposalData) private proposals;
     mapping(uint256 => mapping(address => bool)) private hasVoted;
     mapping(uint256 => mapping(address => VoteType)) private voteRecord;
 
@@ -50,22 +53,22 @@ contract GroupVotingSystem {
     }
 
     modifier onlyMember() {
-        require(groupMembers[msg.sender], "Not a group member");
+        require(groupMembers[msg.sender], "Not a member");
         _;
     }
 
     modifier proposalExists(uint256 proposalId) {
-        require(proposalInfo[proposalId].createdAt != 0, "Proposal does not exist");
+        require(proposals[proposalId].createdAt != 0, "Proposal does not exist");
         _;
     }
 
     modifier isPending(uint256 proposalId) {
-        require(proposalInfo[proposalId].status == ProposalStatus.Pending, "Proposal not pending");
+        require(proposals[proposalId].status == ProposalStatus.Pending, "Proposal not pending");
         _;
     }
 
     modifier votingOpen(uint256 proposalId) {
-        require(block.timestamp <= proposalInfo[proposalId].votingDeadline, "Voting closed");
+        require(block.timestamp <= proposals[proposalId].votingDeadline, "Voting closed");
         _;
     }
 
@@ -110,9 +113,9 @@ contract GroupVotingSystem {
     // ---------------- Proposal Management ----------------
     function createProposal(string calldata description) external onlyMember returns (uint256 proposalId) {
         proposalId = uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, description)));
-        require(proposalInfo[proposalId].createdAt == 0, "Proposal already exists");
+        require(proposals[proposalId].createdAt == 0, "Proposal already exists");
 
-        proposalInfo[proposalId] = ProposalData({
+        proposals[proposalId] = ProposalData({
             description: description,
             proposer: msg.sender,
             createdAt: block.timestamp,
@@ -130,23 +133,25 @@ contract GroupVotingSystem {
         external onlyOwner proposalExists(proposalId) isPending(proposalId)
     {
         require(newDuration >= MIN_VOTING_DURATION && newDuration <= MAX_VOTING_DURATION, "Invalid duration");
-        proposalInfo[proposalId].description = newDesc;
-        proposalInfo[proposalId].votingDeadline = block.timestamp + newDuration;
-        emit ProposalAmended(proposalId, newDesc, proposalInfo[proposalId].votingDeadline);
+        ProposalData storage p = proposals[proposalId];
+        p.description = newDesc;
+        p.votingDeadline = block.timestamp + newDuration;
+
+        emit ProposalAmended(proposalId, newDesc, p.votingDeadline);
     }
 
     function cancelProposal(uint256 proposalId)
         external onlyOwner proposalExists(proposalId) isPending(proposalId)
     {
-        proposalInfo[proposalId].status = ProposalStatus.Cancelled;
+        proposals[proposalId].status = ProposalStatus.Cancelled;
         emit ProposalCancelled(proposalId);
     }
 
     function finalizeProposal(uint256 proposalId)
         external onlyOwner proposalExists(proposalId) isPending(proposalId)
     {
-        ProposalData storage p = proposalInfo[proposalId];
-        require(block.timestamp > p.votingDeadline, "Voting active");
+        ProposalData storage p = proposals[proposalId];
+        require(block.timestamp > p.votingDeadline, "Voting still active");
 
         uint256 quorum = (p.totalVotes * 100) / memberCount;
         require(quorum >= requiredQuorumPercent, "Quorum not met");
@@ -158,10 +163,10 @@ contract GroupVotingSystem {
     function extendVotingPeriod(uint256 proposalId, uint256 newDeadline)
         external onlyOwner proposalExists(proposalId) isPending(proposalId)
     {
-        require(newDeadline > proposalInfo[proposalId].votingDeadline, "New deadline too early");
+        require(newDeadline > proposals[proposalId].votingDeadline, "New deadline too early");
         require(newDeadline <= block.timestamp + MAX_VOTING_DURATION, "Exceeds max duration");
 
-        proposalInfo[proposalId].votingDeadline = newDeadline;
+        proposals[proposalId].votingDeadline = newDeadline;
         emit VotingExtended(proposalId, newDeadline);
     }
 
@@ -174,11 +179,9 @@ contract GroupVotingSystem {
 
         hasVoted[proposalId][msg.sender] = true;
         voteRecord[proposalId][msg.sender] = voteType;
-        proposalInfo[proposalId].totalVotes++;
-
-        if (voteType == VoteType.For) {
-            proposalInfo[proposalId].votesFor++;
-        }
+        ProposalData storage p = proposals[proposalId];
+        p.totalVotes++;
+        if (voteType == VoteType.For) p.votesFor++;
 
         emit VoteCast(proposalId, msg.sender, voteType);
     }
@@ -188,17 +191,16 @@ contract GroupVotingSystem {
     {
         require(hasVoted[proposalId][msg.sender], "No vote to withdraw");
 
-        if (voteRecord[proposalId][msg.sender] == VoteType.For) {
-            proposalInfo[proposalId].votesFor--;
-        }
+        ProposalData storage p = proposals[proposalId];
+        if (voteRecord[proposalId][msg.sender] == VoteType.For) p.votesFor--;
 
         hasVoted[proposalId][msg.sender] = false;
-        proposalInfo[proposalId].totalVotes--;
+        p.totalVotes--;
 
         emit VoteWithdrawn(proposalId, msg.sender);
     }
 
-    // ---------------- Config ----------------
+    // ---------------- Configuration ----------------
     function adjustQuorum(uint256 percent) external onlyOwner {
         require(percent > 0 && percent <= 100, "Invalid percent");
         requiredQuorumPercent = percent;
@@ -213,7 +215,7 @@ contract GroupVotingSystem {
 
     // ---------------- Views ----------------
     function getProposal(uint256 proposalId) external view returns (ProposalData memory) {
-        return proposalInfo[proposalId];
+        return proposals[proposalId];
     }
 
     function hasMemberVoted(uint256 proposalId, address voter) external view returns (bool) {
@@ -235,15 +237,13 @@ contract GroupVotingSystem {
     function getProposalsByStatus(ProposalStatus status) external view returns (uint256[] memory) {
         uint256 count;
         for (uint256 i = 0; i < allProposalIds.length; i++) {
-            if (proposalInfo[allProposalIds[i]].status == status) {
-                count++;
-            }
+            if (proposals[allProposalIds[i]].status == status) count++;
         }
 
         uint256[] memory filtered = new uint256[](count);
         uint256 index;
         for (uint256 i = 0; i < allProposalIds.length; i++) {
-            if (proposalInfo[allProposalIds[i]].status == status) {
+            if (proposals[allProposalIds[i]].status == status) {
                 filtered[index++] = allProposalIds[i];
             }
         }
@@ -252,15 +252,15 @@ contract GroupVotingSystem {
     }
 
     function getTimeRemaining(uint256 proposalId) external view proposalExists(proposalId) returns (uint256) {
-        uint256 deadline = proposalInfo[proposalId].votingDeadline;
+        uint256 deadline = proposals[proposalId].votingDeadline;
         return block.timestamp >= deadline ? 0 : deadline - block.timestamp;
     }
 
     function getVotingSummary(uint256 proposalId)
         external view proposalExists(proposalId)
-        returns (string memory description, ProposalStatus status, uint256 forVotes, uint256 totalVotes)
+        returns (string memory, ProposalStatus, uint256, uint256)
     {
-        ProposalData storage p = proposalInfo[proposalId];
+        ProposalData storage p = proposals[proposalId];
         return (p.description, p.status, p.votesFor, p.totalVotes);
     }
 
@@ -268,25 +268,22 @@ contract GroupVotingSystem {
         return allProposalIds.length;
     }
 
-    // ✅ Newly Added Function
     function getActiveProposals() external view returns (uint256[] memory) {
         uint256 count;
         for (uint256 i = 0; i < allProposalIds.length; i++) {
-            ProposalData storage p = proposalInfo[allProposalIds[i]];
-            if (p.status == ProposalStatus.Pending && block.timestamp <= p.votingDeadline) {
-                count++;
-            }
+            ProposalData storage p = proposals[allProposalIds[i]];
+            if (p.status == ProposalStatus.Pending && block.timestamp <= p.votingDeadline) count++;
         }
 
-        uint256[] memory activeProposals = new uint256[](count);
+        uint256[] memory active = new uint256[](count);
         uint256 index;
         for (uint256 i = 0; i < allProposalIds.length; i++) {
-            ProposalData storage p = proposalInfo[allProposalIds[i]];
+            ProposalData storage p = proposals[allProposalIds[i]];
             if (p.status == ProposalStatus.Pending && block.timestamp <= p.votingDeadline) {
-                activeProposals[index++] = allProposalIds[i];
+                active[index++] = allProposalIds[i];
             }
         }
 
-        return activeProposals;
+        return active;
     }
 }
