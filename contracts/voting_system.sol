@@ -213,7 +213,7 @@ contract GroupVotingSystem {
         emit VotingPeriodUpdated(period);
     }
 
-    // ---------------- Views ----------------
+    //   -------------- Views --------------
     function getProposal(uint256 proposalId) external view returns (ProposalData memory) {
         return proposals[proposalId];
     }
