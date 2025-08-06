@@ -2,11 +2,11 @@
 pragma solidity ^0.8.0;
 
 contract GroupVotingSystem {
-    // ---------------- Enums ----------------
+    // Enums
     enum ProposalStatus { Pending, Accepted, Rejected, Cancelled }
     enum VoteType { None, For, Against }
 
-    // ---------------- Structs ----------------
+    // Structs
     struct ProposalData {
         string description;
         address proposer;
@@ -17,7 +17,7 @@ contract GroupVotingSystem {
         uint256 votesFor;
     }
 
-    // ---------------- State Variables ----------------
+    // State Variables
     address public owner;
     uint256 public memberCount;
     uint256 public requiredQuorumPercent;
@@ -33,7 +33,7 @@ contract GroupVotingSystem {
 
     uint256[] private allProposalIds;
 
-    // ---------------- Events ----------------
+    // Events
     event ProposalCreated(uint256 indexed proposalId, string description, address indexed proposer);
     event VoteCast(uint256 indexed proposalId, address indexed voter, VoteType voteType);
     event VoteWithdrawn(uint256 indexed proposalId, address indexed voter);
@@ -46,7 +46,7 @@ contract GroupVotingSystem {
     event VotingExtended(uint256 indexed proposalId, uint256 newDeadline);
     event VotingPeriodUpdated(uint256 newPeriod);
 
-    // ---------------- Modifiers ----------------
+    // Modifiers
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner");
         _;
@@ -72,7 +72,7 @@ contract GroupVotingSystem {
         _;
     }
 
-    // ---------------- Constructor ----------------
+    // Constructor
     constructor(uint256 quorumPercent, uint256 period) {
         require(quorumPercent > 0 && quorumPercent <= 100, "Invalid quorum");
         require(period >= MIN_VOTING_DURATION && period <= MAX_VOTING_DURATION, "Voting period out of range");
@@ -84,7 +84,7 @@ contract GroupVotingSystem {
         votingPeriod = period;
     }
 
-    // ---------------- Member Management ----------------
+    // Member Management
     function addGroupMember(address member) external onlyOwner {
         require(member != address(0) && !groupMembers[member], "Invalid or existing member");
         groupMembers[member] = true;
@@ -110,7 +110,7 @@ contract GroupVotingSystem {
         emit MemberRemoved(member);
     }
 
-    // ---------------- Proposal Management ----------------
+    // Proposal Management
     function createProposal(string calldata description) external onlyMember returns (uint256 proposalId) {
         proposalId = uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, description)));
         require(proposals[proposalId].createdAt == 0, "Proposal already exists");
@@ -170,7 +170,7 @@ contract GroupVotingSystem {
         emit VotingExtended(proposalId, newDeadline);
     }
 
-    // ---------------- Voting ----------------
+    // Voting
     function vote(uint256 proposalId, VoteType voteType)
         external onlyMember proposalExists(proposalId) isPending(proposalId) votingOpen(proposalId)
     {
@@ -200,7 +200,7 @@ contract GroupVotingSystem {
         emit VoteWithdrawn(proposalId, msg.sender);
     }
 
-    // ---------------- Configuration ----------------
+    // Configuration
     function adjustQuorum(uint256 percent) external onlyOwner {
         require(percent > 0 && percent <= 100, "Invalid percent");
         requiredQuorumPercent = percent;
@@ -213,7 +213,7 @@ contract GroupVotingSystem {
         emit VotingPeriodUpdated(period);
     }
 
-    
+    // View Functions
     function getProposal(uint256 proposalId) external view returns (ProposalData memory) {
         return proposals[proposalId];
     }
@@ -248,43 +248,4 @@ contract GroupVotingSystem {
             }
         }
 
-        return filtered;
-    }
-
-    function getTimeRemaining(uint256 proposalId) external view proposalExists(proposalId) returns (uint256) {
-        uint256 deadline = proposals[proposalId].votingDeadline;
-        return block.timestamp >= deadline ? 0 : deadline - block.timestamp;
-    }
-
-    function getVotingSummary(uint256 proposalId)
-        external view proposalExists(proposalId)
-        returns (string memory, ProposalStatus, uint256, uint256)
-    {
-        ProposalData storage p = proposals[proposalId];
-        return (p.description, p.status, p.votesFor, p.totalVotes);
-    }
-
-    function totalProposals() external view returns (uint256) {
-        return allProposalIds.length;
-    }
-
-    function getActiveProposals() external view returns (uint256[] memory) {
-        uint256 count;
-        for (uint256 i = 0; i < allProposalIds.length; i++) {
-            ProposalData storage p = proposals[allProposalIds[i]];
-            if (p.status == ProposalStatus.Pending && block.timestamp <= p.votingDeadline) count++;
-        }
-
-        uint256[] memory active = new uint256[](count);
-        uint256 index;
-        for (uint256 i = 0; i < allProposalIds.length; i++) {
-            ProposalData storage p = proposals[allProposalIds[i]];
-            if (p.status == ProposalStatus.Pending && block.timestamp <= p.votingDeadline) {
-                active[index++] = allProposalIds[i];
-            }
-        }
-
-        return active;
-    }
-}
-
+       
