@@ -30,6 +30,7 @@ contract GroupVotingSystem {
     mapping(uint256 => ProposalData) private proposals;
     mapping(uint256 => mapping(address => bool)) private hasVoted;
     mapping(uint256 => mapping(address => VoteType)) private voteRecord;
+    mapping(address => address) public voteDelegates;
 
     uint256[] private allProposalIds;
 
@@ -45,6 +46,10 @@ contract GroupVotingSystem {
     event QuorumAdjusted(uint256 newQuorumPercent);
     event VotingExtended(uint256 indexed proposalId, uint256 newDeadline);
     event VotingPeriodUpdated(uint256 newPeriod);
+    event VoteDelegated(address indexed from, address indexed to);
+    event DelegationRevoked(address indexed member);
+    event ProposalDescriptionUpdated(uint256 indexed proposalId, string newDescription);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ------------------ Modifiers ------------------
     modifier onlyOwner() {
@@ -113,6 +118,19 @@ contract GroupVotingSystem {
         emit MemberRemoved(member);
     }
 
+    // ------------------ Voting Delegation ------------------
+    function delegateVote(address to) external onlyMember {
+        require(to != msg.sender, "Cannot delegate to self");
+        require(groupMembers[to], "Can only delegate to members");
+        voteDelegates[msg.sender] = to;
+        emit VoteDelegated(msg.sender, to);
+    }
+
+    function revokeDelegation() external onlyMember {
+        delete voteDelegates[msg.sender];
+        emit DelegationRevoked(msg.sender);
+    }
+
     // ------------------ Proposal Management ------------------
     function createProposal(string calldata description) external onlyMember returns (uint256 proposalId) {
         proposalId = uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, description)));
@@ -144,6 +162,20 @@ contract GroupVotingSystem {
         emit ProposalAmended(proposalId, newDesc, p.votingDeadline);
     }
 
+    function updateProposalDescription(uint256 proposalId, string calldata newDescription) 
+        external proposalExists(proposalId) isPending(proposalId) {
+        require(msg.sender == proposals[proposalId].proposer || msg.sender == owner, "Not authorized");
+        proposals[proposalId].description = newDescription;
+        emit ProposalDescriptionUpdated(proposalId, newDescription);
+    }
+
+    function emergencyCancelProposal(uint256 proposalId) external onlyOwner {
+        ProposalData storage p = proposals[proposalId];
+        require(p.status == ProposalStatus.Pending, "Proposal not active");
+        p.status = ProposalStatus.Cancelled;
+        emit ProposalCancelled(proposalId);
+    }
+
     function cancelProposal(uint256 proposalId)
         external onlyOwner proposalExists(proposalId) isPending(proposalId)
     {
@@ -164,28 +196,55 @@ contract GroupVotingSystem {
     function finalizeProposal(uint256 proposalId)
         external onlyOwner proposalExists(proposalId) isPending(proposalId)
     {
+        _finalizeSingleProposal(proposalId);
+    }
+
+    function batchFinalizeProposals(uint256[] calldata proposalIds) external onlyOwner {
+        for (uint i = 0; i < proposalIds.length; i++) {
+            uint256 proposalId = proposalIds[i];
+            if (proposals[proposalId].status == ProposalStatus.Pending && 
+                block.timestamp > proposals[proposalId].votingDeadline) {
+                _finalizeSingleProposal(proposalId);
+            }
+        }
+    }
+
+    function _finalizeSingleProposal(uint256 proposalId) private {
         ProposalData storage p = proposals[proposalId];
-        require(block.timestamp > p.votingDeadline, "Voting is still active");
-
         uint256 quorum = (p.totalVotes * 100) / memberCount;
-        require(quorum >= requiredQuorumPercent, "Quorum not met");
+        
+        if (quorum >= requiredQuorumPercent) {
+            p.status = (p.votesFor > p.totalVotes / 2)
+                ? ProposalStatus.Accepted
+                : ProposalStatus.Rejected;
+            emit ProposalFinalized(proposalId, p.status);
+        }
+    }
 
-        p.status = (p.votesFor > p.totalVotes / 2)
-            ? ProposalStatus.Accepted
-            : ProposalStatus.Rejected;
-
-        emit ProposalFinalized(proposalId, p.status);
+    function archiveOldProposals(uint256 cutoffTimestamp) external onlyOwner {
+        for (uint i = 0; i < allProposalIds.length; i++) {
+            uint256 proposalId = allProposalIds[i];
+            if (proposals[proposalId].createdAt < cutoffTimestamp && 
+                proposals[proposalId].status == ProposalStatus.Pending) {
+                proposals[proposalId].status = ProposalStatus.Cancelled;
+                emit ProposalCancelled(proposalId);
+            }
+        }
     }
 
     // ------------------ Voting Functions ------------------
     function vote(uint256 proposalId, VoteType voteType)
         external onlyMember proposalExists(proposalId) isPending(proposalId) votingOpen(proposalId)
     {
-        require(voteType == VoteType.For || voteType == VoteType.Against, "Invalid vote");
-        require(!hasVoted[proposalId][msg.sender], "Already voted");
+        address voter = voteDelegates[msg.sender] != address(0) 
+            ? voteDelegates[msg.sender] 
+            : msg.sender;
 
-        hasVoted[proposalId][msg.sender] = true;
-        voteRecord[proposalId][msg.sender] = voteType;
+        require(voteType == VoteType.For || voteType == VoteType.Against, "Invalid vote");
+        require(!hasVoted[proposalId][voter], "Already voted");
+
+        hasVoted[proposalId][voter] = true;
+        voteRecord[proposalId][voter] = voteType;
 
         ProposalData storage p = proposals[proposalId];
         p.totalVotes++;
@@ -193,25 +252,29 @@ contract GroupVotingSystem {
             p.votesFor++;
         }
 
-        emit VoteCast(proposalId, msg.sender, voteType);
+        emit VoteCast(proposalId, voter, voteType);
     }
 
     function withdrawVote(uint256 proposalId)
         external onlyMember proposalExists(proposalId) isPending(proposalId) votingOpen(proposalId)
     {
-        require(hasVoted[proposalId][msg.sender], "You haven't voted");
+        address voter = voteDelegates[msg.sender] != address(0) 
+            ? voteDelegates[msg.sender] 
+            : msg.sender;
+
+        require(hasVoted[proposalId][voter], "You haven't voted");
 
         ProposalData storage p = proposals[proposalId];
 
-        if (voteRecord[proposalId][msg.sender] == VoteType.For) {
+        if (voteRecord[proposalId][voter] == VoteType.For) {
             p.votesFor--;
         }
 
         p.totalVotes--;
-        hasVoted[proposalId][msg.sender] = false;
-        voteRecord[proposalId][msg.sender] = VoteType.None;
+        hasVoted[proposalId][voter] = false;
+        voteRecord[proposalId][voter] = VoteType.None;
 
-        emit VoteWithdrawn(proposalId, msg.sender);
+        emit VoteWithdrawn(proposalId, voter);
     }
 
     // ------------------ Configuration ------------------
@@ -225,6 +288,22 @@ contract GroupVotingSystem {
         require(period >= MIN_VOTING_DURATION && period <= MAX_VOTING_DURATION, "Invalid voting period");
         votingPeriod = period;
         emit VotingPeriodUpdated(period);
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "Invalid address");
+        require(!groupMembers[newOwner], "Already a member");
+        
+        if (!groupMembers[newOwner]) {
+            groupMembers[newOwner] = true;
+            memberCount++;
+        }
+        
+        groupMembers[owner] = false;
+        memberCount--;
+        
+        owner = newOwner;
+        emit OwnershipTransferred(owner, newOwner);
     }
 
     // ------------------ View Functions ------------------
@@ -267,5 +346,27 @@ contract GroupVotingSystem {
         }
 
         return filtered;
+    }
+
+    function getProposalStats() external view returns (
+        uint256 total,
+        uint256 pending,
+        uint256 accepted,
+        uint256 rejected,
+        uint256 cancelled
+    ) {
+        total = allProposalIds.length;
+        for (uint i = 0; i < allProposalIds.length; i++) {
+            ProposalStatus status = proposals[allProposalIds[i]].status;
+            if (status == ProposalStatus.Pending) pending++;
+            else if (status == ProposalStatus.Accepted) accepted++;
+            else if (status == ProposalStatus.Rejected) rejected++;
+            else if (status == ProposalStatus.Cancelled) cancelled++;
+        }
+    }
+
+    function getVotingPower(address member) public view returns (uint256) {
+        if (!groupMembers[member]) return 0;
+        return 1; // Default: 1 vote per member
     }
 }
