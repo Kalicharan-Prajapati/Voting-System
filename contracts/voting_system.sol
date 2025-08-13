@@ -117,6 +117,18 @@ contract GroupVotingSystem {
         memberCount--;
         emit MemberRemoved(member);
     }
+ // ------------------ Voting Delegation ------------------
+    function delegateVote(address to) external onlyMember {
+        require(to != msg.sender, "Cannot delegate to self");
+        require(groupMembers[to], "Can only delegate to members");
+        voteDelegates[msg.sender] = to;
+        emit VoteDelegated(msg.sender, to);
+    }
+
+    function revokeDelegation() external onlyMember {
+        delete voteDelegates[msg.sender];
+        emit DelegationRevoked(msg.sender);
+    }
 
     // ------------------ Proposal Management ------------------
     function createProposal(string calldata description) external onlyMember returns (uint256 proposalId) {
@@ -357,4 +369,5 @@ contract GroupVotingSystem {
         return 1; // Default: 1 vote per member
     }
 }
+
 
