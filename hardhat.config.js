@@ -38,9 +38,9 @@ module.exports = {
     currency: "USD",
   },
   etherscan: {
-    // Add API key for contract verification if needed
+    // Add API key for contract verification if needed 
     apiKey: {
-      core_testnet2: process.env.ETHERSCAN_API_KEY || "your-api-key-here",
+      core_testnet2: process.env.ETHERSCAN_API_KEY || "your-api-key",
     },
   },
 };
