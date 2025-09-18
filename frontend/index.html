@@ -1,1 +1,50 @@
-1
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Decentralized Group Voting</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>🗳️ Decentralized Group Voting System</h1>
+
+    <!-- Wallet Connection -->
+    <button id="connectWallet">🔗 Connect MetaMask</button>
+    <p id="walletAddress"></p>
+
+    <hr>
+
+    <!-- Proposal Creation -->
+    <h2>Create Proposal</h2>
+    <input type="text" id="proposalDesc" placeholder="Enter proposal description">
+    <button id="createProposal">Create Proposal</button>
+
+    <hr>
+
+    <!-- Voting Section -->
+    <h2>Vote on Proposal</h2>
+    <input type="number" id="proposalIdVote" placeholder="Proposal ID">
+    <button id="voteYes">👍 Vote Yes</button>
+    <button id="voteNo">👎 Vote No</button>
+
+    <hr>
+
+    <!-- Finalize Proposal -->
+    <h2>Finalize Proposal</h2>
+    <input type="number" id="proposalIdFinalize" placeholder="Proposal ID">
+    <button id="finalizeProposal">Finalize</button>
+
+    <hr>
+
+    <!-- Get Proposal Details -->
+    <h2>Get Proposal Details</h2>
+    <input type="number" id="proposalIdDetails" placeholder="Proposal ID">
+    <button id="getDetails">Fetch Details</button>
+    <pre id="proposalDetails"></pre>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
