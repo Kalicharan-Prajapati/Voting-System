@@ -117,7 +117,8 @@ contract GroupVotingSystem {
         memberCount--;
         emit MemberRemoved(member);
     }
- // ------------------ Voting Delegation ------------------
+
+    // ------------------ Voting Delegation ------------------
     function delegateVote(address to) external onlyMember {
         require(to != msg.sender, "Cannot delegate to self");
         require(groupMembers[to], "Can only delegate to members");
@@ -368,19 +369,23 @@ contract GroupVotingSystem {
         if (!groupMembers[member]) return 0;
         return 1; // Default: 1 vote per member
     }
+
+    // ------------------ Extra Utility ------------------
+    function getProposalProgress(uint256 proposalId) 
+        external view proposalExists(proposalId) 
+        returns (
+            uint256 totalVotes,
+            uint256 votesFor,
+            uint256 votesAgainst,
+            uint256 timeRemaining
+        ) 
+    {
+        ProposalData storage p = proposals[proposalId];
+        totalVotes = p.totalVotes;
+        votesFor = p.votesFor;
+        votesAgainst = p.totalVotes - p.votesFor;
+        timeRemaining = (block.timestamp >= p.votingDeadline) 
+            ? 0 
+            : p.votingDeadline - block.timestamp;
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
