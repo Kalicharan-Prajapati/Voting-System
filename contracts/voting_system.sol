@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: 
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.0;
 
 contract GroupVotingSystem {
@@ -389,6 +390,7 @@ contract GroupVotingSystem {
             : p.votingDeadline - block.timestamp;
     }
 }
+
 
 
 
